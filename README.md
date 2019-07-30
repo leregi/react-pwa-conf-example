@@ -66,3 +66,80 @@ This section has moved here: https://facebook.github.io/create-react-app/docs/de
 ### `npm run build` fails to minify
 
 This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
+
+
+### convert a react app to a pwa
+
+Step 1 — Add the new dependencies
+
+$ yarn add workbox-webpack-plugin 
+$ yarn add react-app-rewire-workbox 
+$ yarn add react-app-rewired
+
+Step 2— Create config-overrides.js file
+Create a file in the root of your project called config-overrides.js
+
+const {rewireWorkboxInject, defaultInjectConfig} = require('react-app-rewire-workbox');
+const path = require('path');
+
+module.exports = function override(config, env) {
+  if (env === "production") {
+    console.log("Production build - Adding Workbox for PWAs");
+    // Extend the default injection config with required swSrc
+    const workboxConfig = {
+      ...defaultInjectConfig,
+      swSrc: path.join(__dirname, 'src', 'custom-sw.js')
+    };
+    config = rewireWorkboxInject(workboxConfig)(config, env);
+  }
+
+  return config;
+};
+
+
+
+
+
+Step 3— Replace the react-scripts properties
+
+{
+  ...
+  "scripts": {
+    "start": "react-app-rewired start",
+    "build": "react-app-rewired build",
+    "test": "react-app-rewired test --env=jsdom",
+  },
+  ...
+}
+
+Step 4— Create custom-sw.js file
+Now create a custom-sw.js file in your src/ folder and paste this code:
+
+// See https://developers.google.com/web/tools/workbox/guides/configure-workbox
+workbox.core.setLogLevel(workbox.core.LOG_LEVELS.debug);
+
+self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
+self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+
+// We need this in Webpack plugin (refer to swSrc option): https://developers.google.com/web/tools/workbox/modules/workbox-webpack-plugin#full_injectmanifest_config
+workbox.precaching.precacheAndRoute(self.__precacheManifest);
+
+// app-shell
+workbox.routing.registerRoute("/", workbox.strategies.networkFirst());
+
+Step 5— Change the default service worker file name
+
+Change the default name of your service worker to custom-sw.js in the registerServiceWorker.js file
+
+export default function register() {  
+  // Some validations here
+  window.addEventListener('load', () => {
+    const swUrl = `${process.env.PUBLIC_URL}/custom-sw.js`; // In this line
+    ...
+  }
+  // Another stuffs here
+}
+
+
+Building our app
+$ yarn build
